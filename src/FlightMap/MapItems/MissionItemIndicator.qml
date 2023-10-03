@@ -46,6 +46,7 @@ MapQuickItem {
             id:                 _label
             checked:            _item._isCurrentItem
             label:              _item.missionItem.abbreviation
+            progress:           _item.missionItem.flyView ? _item.missionItem.progress : ""
             index:              _item._usesAbbreviation ? -1 : _item.missionItem.sequenceNumber
             indicatorSubText:   _item._isGrouped ? "…" : ""
             small:              !_item._isGrouped && !_item._isCurrentItem
