@@ -353,6 +353,7 @@ private slots:
     void _recalcFlightPathSegments              (void);
     void _recalcMissionFlightStatus             (void);
     void _progressPctChanged                    (double progressPct);
+    void _currentProgressChanged                (int currentIndex, uint8_t unit, uint8_t percentage, uint16_t remaining);
     void _visualItemsDirtyChanged               (bool dirty);
     void _managerSendComplete                   (bool error);
     void _managerRemoveAllComplete              (bool error);

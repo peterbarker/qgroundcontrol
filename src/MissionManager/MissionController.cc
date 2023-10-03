@@ -1669,6 +1669,8 @@ void MissionController::_managerVehicleChanged(Vehicle* managerVehicle)
     connect(_managerVehicle, &Vehicle::defaultHoverSpeedChanged,        this, &MissionController::_recalcMissionFlightStatusSignal, Qt::QueuedConnection);
     connect(_managerVehicle, &Vehicle::vehicleTypeChanged,              this, &MissionController::complexMissionItemsChanged);
 
+    connect(_missionManager, &MissionManager::currentProgressChanged,   this, &MissionController::_currentProgressChanged);
+
     emit complexMissionItemsChanged();
     emit resumeMissionIndexChanged();
 }
@@ -1903,6 +1905,14 @@ void MissionController::_progressPctChanged(double progressPct)
     if (!QGC::fuzzyCompare(progressPct, _progressPct)) {
         _progressPct = progressPct;
         emit progressPctChanged(progressPct);
+    }
+}
+
+void MissionController::_currentProgressChanged(int currentIndex, uint8_t unit, uint8_t percentage, uint16_t remaining)
+{
+    if (currentIndex < _visualItems->count()) {
+        VisualMissionItem* item = _visualItems->value<VisualMissionItem*>(currentIndex);
+        item->setProgress((MISSION_ITEM_PROGRESS_UNITS)unit, percentage, remaining);
     }
 }
 
