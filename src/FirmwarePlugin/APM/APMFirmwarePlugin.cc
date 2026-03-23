@@ -67,6 +67,12 @@ bool APMFirmwarePlugin::isCapable(const Vehicle* vehicle, FirmwareCapabilities c
         available |= TakeoffVehicleCapability;
         available |= GuidedTakeoffCapability;
         available |= ChangeHeadingCapability;
+        // Copter 4.8 adds support for MAV_CMD_DO_ORBIT:
+        if (vehicle->firmwareMajorVersion() > 4 ||
+            (vehicle->firmwareMajorVersion() == 4 &&
+             vehicle->firmwareMinorVersion() >= 8)) {
+            available |= OrbitModeCapability;
+        }
     } else if (vehicle->vtol()) {
         available |= TakeoffVehicleCapability;
         available |= GuidedTakeoffCapability;
