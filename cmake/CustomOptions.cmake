@@ -167,7 +167,7 @@ set(QGC_MAVLINK_GIT_REPO
     CACHE STRING "MAVLink repository URL"
 )
 set(QGC_MAVLINK_GIT_TAG
-    "c409cf690454db6d3e004bd14173bc6c7ff1e0ff"
+    "eb31fb0eebc2e6b5cf1ce33dcb00361ce2e3ef44"
     CACHE STRING "MAVLink repository commit/tag"
 )
 set(QGC_MAVLINK_DIALECT
