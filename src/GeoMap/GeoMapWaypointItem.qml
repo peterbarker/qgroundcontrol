@@ -114,6 +114,36 @@ GeoMapItem {
         visible: root.grouped
     }
 
+    // Progress through the item as reported by NAV_CONTROLLER_PROGRESS (Fly
+    // view only), in a side label styled like GeoMapMissionLabel's
+    readonly property string _progress: item ? item.progress : ""
+
+    Rectangle {
+        anchors.left: parent.right
+        anchors.leftMargin: ScreenTools.defaultFontPixelWidth / 2
+        anchors.verticalCenter: parent.verticalCenter
+        width: progressColumn.width + ScreenTools.defaultFontPixelWidth
+        height: progressColumn.height
+        radius: ScreenTools.defaultFontPixelHeight / 2
+        color: root._markerColor
+        visible: root._progress !== ""
+
+        Column {
+            id: progressColumn
+            anchors.centerIn: parent
+
+            QGCLabel {
+                text: root.item ? (root.item.abbreviation !== "" ? root.item.abbreviation : root.item.commandName) : ""
+                color: "white"
+            }
+
+            QGCLabel {
+                text: root._progress
+                color: "white"
+            }
+        }
+    }
+
     // The item itself tracks the projected marker position at any tilt, so
     // this hit target follows the 3D sphere through the 2D<->3D crossfade
     MouseArea {
