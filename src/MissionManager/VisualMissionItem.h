@@ -79,6 +79,7 @@ public:
     Q_PROPERTY(int              previousVTOLMode                    MEMBER _previousVTOLMode                                                NOTIFY previousVTOLModeChanged)                     ///< Current VTOL mode (VehicleClass_t) prior to executing this item
 
     Q_PROPERTY(QString          progress                            READ progress                                                           NOTIFY progressChanged)
+    Q_PROPERTY(int              progressPercentage                  READ progressPercentage                                                 NOTIFY progressChanged)    ///< -1 if unknown
 
     Q_PROPERTY(PlanMasterController*    masterController    READ masterController                                                   CONSTANT)
     Q_PROPERTY(ReadyForSaveState        readyForSaveState   READ readyForSaveState                                                  NOTIFY readyForSaveStateChanged)
@@ -97,6 +98,7 @@ public:
     Q_PROPERTY(double distanceFromStart READ distanceFromStart      WRITE setDistanceFromStart  NOTIFY distanceFromStartChanged)    ///< Flight path cumalative horizontal distance from home point to this item
 
     QString progress            (void) const;
+    int     progressPercentage  (void) const { return _progress.percentage <= 100 ? _progress.percentage : -1; }
     /// Set the progress of this item as reported by NAV_CONTROLLER_PROGRESS. Unknown values are NaN (UINT8_MAX for percentage)
     void    setProgress         (uint8_t percentage, float distanceRemaining, float timeRemaining, float countRemaining);
     void    clearProgress       (void);

@@ -18,6 +18,7 @@ MapQuickItem {
     readonly property bool _isCurrentItem: missionItem ? missionItem.isCurrentItem || missionItem.hasCurrentChildItem : false
     readonly property bool _usesAbbreviation: missionItem ? missionItem.abbreviation !== "" : false
     readonly property string _progress: missionItem && missionItem.flyView ? missionItem.progress : ""
+    readonly property int _progressPercentage: missionItem && missionItem.flyView ? missionItem.progressPercentage : -1
     readonly property var _group: indicatorGroup ? indicatorGroup.groupForItem(missionItem) : null
     readonly property bool _isGrouped: _group ? _group.items.length > 1 : false
     readonly property bool _isGroupRepresentative: !_group || _group.representative === missionItem
@@ -48,6 +49,7 @@ MapQuickItem {
             checked:            _item._isCurrentItem
             label:              _item.missionItem.abbreviation
             progress:           _item._progress
+            progressPercentage: _item._progressPercentage
             // Items without an abbreviation (e.g. waypoints) have no label for the progress to sit under, so name them while progress is shown
             supplementaryLabel: !_item._usesAbbreviation && _item._progress !== "" ? _item.missionItem.commandName : ""
             index:              _item._usesAbbreviation ? -1 : _item.missionItem.sequenceNumber

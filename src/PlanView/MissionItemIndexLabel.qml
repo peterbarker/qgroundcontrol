@@ -14,6 +14,7 @@ Canvas {
 
     property string label                           ///< Label to show to the side of the index indicator
     property string progress                        ///< Label to show the progress of the mission item
+    property int    progressPercentage:     -1      ///< Percentage complete shown as a ring around the indicator, -1 for none
     property int    index:                  0       ///< Index to show in the indicator, 0 will show single char label instead, -1 first char of label in indicator full label to the side
     property bool   checked:                false
     property bool   small:                  !checked
@@ -171,6 +172,36 @@ Canvas {
             visible: text !== ""
         }
     }
+
+    // Ring around the indicator showing the percentage complete
+    Canvas {
+        id:                 progressRing
+        anchors.centerIn:   indicator
+        width:              indicator.width + (_ringWidth * 4)
+        height:             width
+        visible:            progressPercentage >= 0
+
+        property real _ringWidth: Math.max(2, Math.round(ScreenTools.defaultFontPixelHeight / 6))
+
+        onVisibleChanged: requestPaint()
+
+        onPaint: {
+            var context = getContext("2d")
+            context.reset()
+            var radius = (width - _ringWidth) / 2
+            context.lineWidth = _ringWidth
+            context.strokeStyle = Qt.rgba(0, 0, 0, 0.5)
+            context.beginPath()
+            context.arc(width / 2, height / 2, radius, 0, 2 * Math.PI)
+            context.stroke()
+            context.strokeStyle = "white"
+            context.beginPath()
+            context.arc(width / 2, height / 2, radius, -Math.PI / 2, -Math.PI / 2 + (2 * Math.PI * progressPercentage / 100))
+            context.stroke()
+        }
+    }
+
+    onProgressPercentageChanged: progressRing.requestPaint()
 
     // Extra circle to indicate selection
     Rectangle {

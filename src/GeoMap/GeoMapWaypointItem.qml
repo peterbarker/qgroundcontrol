@@ -115,8 +115,41 @@ GeoMapItem {
     }
 
     // Progress through the item as reported by NAV_CONTROLLER_PROGRESS (Fly
-    // view only), in a side label styled like GeoMapMissionLabel's
+    // view only), in a side label styled like GeoMapMissionLabel's and, where
+    // the percentage complete is known, a ring around the dot
     readonly property string _progress: item ? item.progress : ""
+    readonly property int _progressPercentage: item ? item.progressPercentage : -1
+
+    Canvas {
+        id: progressRing
+        anchors.centerIn: parent
+        width: root._indicatorSize + (_ringWidth * 4)
+        height: width
+        opacity: root.contentOpacity2D
+        visible: root._progressPercentage >= 0
+
+        property real _ringWidth: Math.max(2, Math.round(ScreenTools.defaultFontPixelHeight / 6))
+
+        onVisibleChanged: requestPaint()
+        onWidthChanged: requestPaint()
+
+        onPaint: {
+            const context = getContext("2d")
+            context.reset()
+            const radius = (width - _ringWidth) / 2
+            context.lineWidth = _ringWidth
+            context.strokeStyle = Qt.rgba(0, 0, 0, 0.5)
+            context.beginPath()
+            context.arc(width / 2, height / 2, radius, 0, 2 * Math.PI)
+            context.stroke()
+            context.strokeStyle = "white"
+            context.beginPath()
+            context.arc(width / 2, height / 2, radius, -Math.PI / 2, -Math.PI / 2 + (2 * Math.PI * root._progressPercentage / 100))
+            context.stroke()
+        }
+    }
+
+    on_ProgressPercentageChanged: progressRing.requestPaint()
 
     Rectangle {
         anchors.left: parent.right
