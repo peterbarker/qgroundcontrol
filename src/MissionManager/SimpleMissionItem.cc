@@ -402,7 +402,7 @@ QString SimpleMissionItem::abbreviation() const
     case MAV_CMD_NAV_LOITER_UNLIM:
         return tr("Loiter");
     case MAV_CMD_NAV_LOITER_TO_ALT:
-        return tr("Loiter (altitide)");
+        return tr("Loiter (altitude)");
     default:
         return QString();
     }
