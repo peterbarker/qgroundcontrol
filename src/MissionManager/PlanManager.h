@@ -69,7 +69,7 @@ signals:
     void inProgressChanged          (bool inProgress);
     void error                      (int errorCode, const QString& errorMsg);
     void currentIndexChanged        (int currentIndex);
-    void currentProgressChanged     (int currentIndex, uint8_t unit, uint8_t percentage, uint16_t remaining);
+    void currentProgressChanged     (int sequenceNumber, uint8_t percentage, float distanceRemaining, float timeRemaining, float countRemaining);
     void lastCurrentIndexChanged    (int lastCurrentIndex);
     void progressPctChanged         (double progressPercentPct);
     void removeAllComplete          (bool error);

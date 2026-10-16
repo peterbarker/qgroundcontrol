@@ -3,6 +3,7 @@
 #include "PlanMasterController.h"
 #include "Vehicle.h"
 #include "QGCMath.h"
+#include "FactMetaData.h"
 
 // All VisualMissionItem derived classes are parented to masterController in order to tie their lifecycles together.
 
@@ -69,7 +70,7 @@ void VisualMissionItem::setIsCurrentItem(bool isCurrentItem)
         // If we're no longer the current item, clear the progress so it isn't
         // stale if we re-select this item.
         if (!isCurrentItem) {
-            setProgress(MISSION_ITEM_PROGRESS_UNITS_NOT_USED, 0, 0);
+            clearProgress();
         }
 
         _isCurrentItem = isCurrentItem;
@@ -247,44 +248,52 @@ void VisualMissionItem::_amslExitAltChanged(void)
 }
 
 QString VisualMissionItem::progress(void) const {
-    QString progress = "";
-
-    switch (_progress.unit) {
-    case MISSION_ITEM_PROGRESS_UNITS_NOT_USED:
-    case MISSION_ITEM_PROGRESS_UNITS_ENUM_END:
-        break;
-    case MISSION_ITEM_PROGRESS_UNITS_DISTANCE: {
-        uint32_t distance = FactMetaData::metersToAppSettingsHorizontalDistanceUnits(_progress.remaining).toUInt();
-        QString units = FactMetaData::appSettingsHorizontalDistanceUnitsString();
-        progress = QStringLiteral("%1%2").arg(distance).arg(units);
-        break;
+    // NAV_CONTROLLER_PROGRESS may fill in any of the remaining fields; show the first one that is valid
+    if (!qIsNaN(_progress.distanceRemaining)) {
+        const uint32_t distance = FactMetaData::metersToAppSettingsHorizontalDistanceUnits(_progress.distanceRemaining).toUInt();
+        const QString units = FactMetaData::appSettingsHorizontalDistanceUnitsString();
+        return QStringLiteral("%1%2").arg(distance).arg(units);
     }
-    case MISSION_ITEM_PROGRESS_UNITS_TIME: {
+
+    if (!qIsNaN(_progress.timeRemaining)) {
         const QChar fillChar = '0';
         const int width = 2;
         const int base = 10;
-        const uint16_t hours   = _progress.remaining / 3600;
-        const uint16_t minutes = (_progress.remaining - (hours * 3600)) / 60;
-        const uint16_t seconds = _progress.remaining - (hours * 3600) - (minutes * 60);
-        progress = QStringLiteral("%1:%2:%3").arg(hours,   width, base, fillChar)
-                       .arg(minutes, width, base, fillChar)
-                       .arg(seconds, width, base, fillChar);
-        break;
-    }
-    case MISSION_ITEM_PROGRESS_UNITS_COUNT:
-        progress = QStringLiteral("%1 remaining").arg(_progress.remaining);
-        break;
+        const uint32_t remaining = static_cast<uint32_t>(qMax(0.0f, _progress.timeRemaining));
+        const uint32_t hours   = remaining / 3600;
+        const uint32_t minutes = (remaining % 3600) / 60;
+        const uint32_t seconds = remaining % 60;
+        return QStringLiteral("%1:%2:%3").arg(hours,   width, base, fillChar)
+                   .arg(minutes, width, base, fillChar)
+                   .arg(seconds, width, base, fillChar);
     }
 
-    return progress;
+    if (!qIsNaN(_progress.countRemaining)) {
+        return tr("%1 remaining").arg(_progress.countRemaining, 0, 'g', 3);
+    }
+
+    return QString();
 }
 
-void VisualMissionItem::setProgress(MISSION_ITEM_PROGRESS_UNITS unit, uint8_t percentage, uint16_t remaining) {
-    if (_progress.unit != unit || _progress.percentage != percentage || _progress.remaining != remaining) {
-        _progress.unit = unit;
+static bool _sameProgressValue(float a, float b)
+{
+    return (qIsNaN(a) && qIsNaN(b)) || a == b;
+}
+
+void VisualMissionItem::setProgress(uint8_t percentage, float distanceRemaining, float timeRemaining, float countRemaining) {
+    if (_progress.percentage != percentage ||
+        !_sameProgressValue(_progress.distanceRemaining, distanceRemaining) ||
+        !_sameProgressValue(_progress.timeRemaining, timeRemaining) ||
+        !_sameProgressValue(_progress.countRemaining, countRemaining)) {
         _progress.percentage = percentage;
-        _progress.remaining = remaining;
+        _progress.distanceRemaining = distanceRemaining;
+        _progress.timeRemaining = timeRemaining;
+        _progress.countRemaining = countRemaining;
 
         emit progressChanged();
     }
+}
+
+void VisualMissionItem::clearProgress(void) {
+    setProgress(UINT8_MAX, qQNaN(), qQNaN(), qQNaN());
 }

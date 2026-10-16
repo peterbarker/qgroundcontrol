@@ -2,6 +2,7 @@
 
 #include <QtCore/QObject>
 #include <QtCore/QString>
+#include <QtCore/QtNumeric>
 #include <QtPositioning/QGeoCoordinate>
 #include <QtQmlIntegration/QtQmlIntegration>
 
@@ -96,7 +97,9 @@ public:
     Q_PROPERTY(double distanceFromStart READ distanceFromStart      WRITE setDistanceFromStart  NOTIFY distanceFromStartChanged)    ///< Flight path cumalative horizontal distance from home point to this item
 
     QString progress            (void) const;
-    void    setProgress         (MISSION_ITEM_PROGRESS_UNITS units, uint8_t percentage, uint16_t remaining);
+    /// Set the progress of this item as reported by NAV_CONTROLLER_PROGRESS. Unknown values are NaN (UINT8_MAX for percentage)
+    void    setProgress         (uint8_t percentage, float distanceRemaining, float timeRemaining, float countRemaining);
+    void    clearProgress       (void);
 
     // Property accesors
     bool    homePosition        (void) const { return _homePositionSpecialCase; }
@@ -307,9 +310,10 @@ private:
     void _commonInit(void);
 
     struct {
-        MISSION_ITEM_PROGRESS_UNITS unit;
-        uint8_t percentage;
-        uint16_t remaining;
+        uint8_t percentage          = UINT8_MAX;
+        float   distanceRemaining   = qQNaN();
+        float   timeRemaining       = qQNaN();
+        float   countRemaining      = qQNaN();
     } _progress;
 
     QTimer                      _updateTerrainTimer;

@@ -226,6 +226,10 @@ void MissionManager::_mavlinkMessageReceived(const mavlink_message_t& message)
         _handleMissionCurrent(message);
         break;
 
+    case MAVLINK_MSG_ID_NAV_CONTROLLER_PROGRESS:
+        _handleNavControllerProgress(message);
+        break;
+
     case MAVLINK_MSG_ID_HEARTBEAT:
         _handleHeartbeat(message);
         break;
@@ -271,12 +275,21 @@ void MissionManager::_handleMissionCurrent(const mavlink_message_t& message)
     mavlink_mission_current_t missionCurrent;
     mavlink_msg_mission_current_decode(&message, &missionCurrent);
     _updateMissionIndex(missionCurrent.seq);
+}
 
+void MissionManager::_handleNavControllerProgress(const mavlink_message_t& message)
+{
+    mavlink_nav_controller_progress_t navControllerProgress;
+    mavlink_msg_nav_controller_progress_decode(&message, &navControllerProgress);
+
+    // Progress for anything other than a mission item, e.g. MAV_MISSION_TYPE_ALL for modes such as Guided and RTL,
+    // is reported with a sequence number of -1
     emit currentProgressChanged(
-        missionCurrent.seq,
-        missionCurrent.item_progress_units,
-        missionCurrent.item_progress_percentage,
-        missionCurrent.item_progress_remaining
+        (navControllerProgress.mission_type == MAV_MISSION_TYPE_MISSION) ? navControllerProgress.seq : -1,
+        navControllerProgress.percentage_complete,
+        navControllerProgress.distance_remaining,
+        navControllerProgress.time_remaining,
+        navControllerProgress.count_remaining
     );
 }
 

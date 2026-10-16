@@ -353,7 +353,8 @@ private slots:
     void _recalcFlightPathSegments              (void);
     void _recalcMissionFlightStatus             (void);
     void _progressPctChanged                    (double progressPct);
-    void _currentProgressChanged                (int currentIndex, uint8_t unit, uint8_t percentage, uint16_t remaining);
+    void _currentProgressChanged                (int sequenceNumber, uint8_t percentage, float distanceRemaining, float timeRemaining, float countRemaining);
+    void _progressTimeout                       (void);
     void _visualItemsDirtyChanged               (bool dirty);
     void _managerSendComplete                   (bool error);
     void _managerRemoveAllComplete              (bool error);
@@ -446,6 +447,7 @@ private:
     VisualMissionItem*          _currentPlanViewItem =          nullptr;
     TakeoffMissionItem*         _takeoffMissionItem =           nullptr;
     QTimer                      _updateTimer;
+    QTimer                      _progressTimer;
     QGCGeoBoundingCube          _travelBoundingCube;
     QGeoCoordinate              _takeoffCoordinate;
     QGeoCoordinate              _previousCoordinate;

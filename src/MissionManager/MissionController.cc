@@ -48,7 +48,13 @@ MissionController::MissionController(PlanMasterController* masterController, QOb
 
     _updateTimer.setSingleShot(true);
 
+    // NAV_CONTROLLER_PROGRESS stops arriving when the vehicle leaves the mission (e.g. a mode change), so clear
+    // progress which has not been refreshed recently rather than leave it showing on the current item
+    _progressTimer.setSingleShot(true);
+    _progressTimer.setInterval(3000);
+
     connect(&_updateTimer,                                      &QTimer::timeout,                                       this, &MissionController::_updateTimeout);
+    connect(&_progressTimer,                                    &QTimer::timeout,                                       this, &MissionController::_progressTimeout);
     connect(_planViewSettings->takeoffItemNotRequired(),        &Fact::rawValueChanged,                                 this, &MissionController::_recalcPlanViewState);
     connect(_planViewSettings->allowMultipleLandingPatterns(),  &Fact::rawValueChanged,                                 this, &MissionController::multipleLandPatternsAllowedChanged);
     connect(_masterController,                                  &PlanMasterController::managerVehicleChanged,           this, &MissionController::multipleLandPatternsAllowedChanged);
@@ -1908,11 +1914,38 @@ void MissionController::_progressPctChanged(double progressPct)
     }
 }
 
-void MissionController::_currentProgressChanged(int currentIndex, uint8_t unit, uint8_t percentage, uint16_t remaining)
+void MissionController::_currentProgressChanged(int sequenceNumber, uint8_t percentage, float distanceRemaining, float timeRemaining, float countRemaining)
 {
-    if (currentIndex < _visualItems->count()) {
-        VisualMissionItem* item = _visualItems->value<VisualMissionItem*>(currentIndex);
-        item->setProgress((MISSION_ITEM_PROGRESS_UNITS)unit, percentage, remaining);
+    if (!_flyView) {
+        return;
+    }
+
+    // Progress which is not for a mission item, e.g. towards the target of a mode such as Guided or RTL
+    if (sequenceNumber < 0) {
+        _progressTimeout();
+        return;
+    }
+
+    // Map the vehicle's sequence number onto our visual items the same way _currentMissionIndexChanged does
+    if (!_controllerVehicle->firmwarePlugin()->sendHomePositionToVehicle()) {
+        sequenceNumber++;
+    }
+
+    for (int i=0; i<_visualItems->count(); i++) {
+        VisualMissionItem* item = qobject_cast<VisualMissionItem*>(_visualItems->get(i));
+        if (item->sequenceNumber() == sequenceNumber) {
+            item->setProgress(percentage, distanceRemaining, timeRemaining, countRemaining);
+            break;
+        }
+    }
+
+    _progressTimer.start();
+}
+
+void MissionController::_progressTimeout(void)
+{
+    for (int i=0; i<_visualItems->count(); i++) {
+        qobject_cast<VisualMissionItem*>(_visualItems->get(i))->clearProgress();
     }
 }
 
