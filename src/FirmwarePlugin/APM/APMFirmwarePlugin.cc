@@ -442,6 +442,9 @@ void APMFirmwarePlugin::initializeStreamRates(Vehicle *vehicle)
     // make the LandAbort action available.
     vehicle->sendMavCommand(MAV_COMP_ID_AUTOPILOT1, MAV_CMD_SET_MESSAGE_INTERVAL, false /* showError */, MAVLINK_MSG_ID_EXTENDED_SYS_STATE, 1000000 /* 1 second interval in usec */);
 
+    // ArduPilot only sends NAV_CONTROLLER_PROGRESS when requested; it provides the mission item progress shown on the map
+    vehicle->sendMavCommand(MAV_COMP_ID_AUTOPILOT1, MAV_CMD_SET_MESSAGE_INTERVAL, false /* showError */, MAVLINK_MSG_ID_NAV_CONTROLLER_PROGRESS, 500000 /* 2Hz interval in usec */);
+
     instanceData->lastBatteryStatusTime = instanceData->lastHomePositionTime = QTime::currentTime();
 }
 
