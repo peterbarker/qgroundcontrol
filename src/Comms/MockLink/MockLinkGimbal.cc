@@ -179,17 +179,13 @@ void MockLinkGimbal::_sendCommandAck(uint16_t command, uint8_t result, uint8_t s
     qCDebug(MockLinkGimbalLog) << "Sending command ACK -" << QString("%1(%2)").arg(commandName).arg(command) << "result:" << (result == MAV_RESULT_ACCEPTED ? "ACCEPTED" : result == MAV_RESULT_DENIED ? "DENIED" : QString::number(result));
 
     mavlink_message_t msg{};
-    (void) mavlink_msg_command_ack_pack_chan(
-        _mockLink->vehicleId(),
-        sourceCompId,
-        _mockLink->outgoingMavlinkChannel(),
-        &msg,
-        command,
-        result,
-        0,    // progress
-        0,    // result_param2
-        0,    // target_system
-        0     // target_component
+    (void) mavlink_msg_command_ack_pack_chan(_mockLink->vehicleId(), sourceCompId, _mockLink->outgoingMavlinkChannel(),
+                                             &msg, command, result,
+                                             0,  // progress
+                                             0,  // result_param2
+                                             0,  // target_system
+                                             0,  // target_component
+                                             0   // command_opaque_id
     );
     _mockLink->respondWithMavlinkMessage(msg);
 }

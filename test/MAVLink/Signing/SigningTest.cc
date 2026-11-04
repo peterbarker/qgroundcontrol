@@ -670,7 +670,7 @@ void SigningTest::_testStripSignatureForRetransmitProducesValidCrc()
         SigningChannel ch;
         QVERIFY(ch.init(MAVLINK_COMM_0, kv, MAVLinkSigning::insecureConnectionAcceptUnsignedCallback));
         mavlink_msg_command_long_pack_chan(sourceId, MAV_COMP_ID_AUTOPILOT1, MAVLINK_COMM_0, &signed_msg, targetId, 0,
-                                           MAV_CMD_REQUEST_MESSAGE, 0, 1, 2, 3, 4, 5, 6, 7);
+                                           MAV_CMD_REQUEST_MESSAGE, 0, 1, 2, 3, 4, 5, 6, 7, 0);
         QVERIFY(MAVLinkSigning::isMessageSigned(signed_msg));
         QVERIFY(MAVLinkSigning::verifySignature(kv, signed_msg));
         MAVLinkSigning::signMessage(kv, 0, 123456789, signed_msg);
