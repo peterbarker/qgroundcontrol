@@ -1260,6 +1260,7 @@ void MockLink::_updateIncomingMessageCounts(const mavlink_message_t &msg)
 
         _receivedMavCommandCountMap[static_cast<MAV_CMD>(request.command)]++;
         _receivedMavCommandByCompCountMap[static_cast<MAV_CMD>(request.command)][request.target_component]++;
+        _receivedCommandOpaqueIdMap[static_cast<MAV_CMD>(request.command)].append(request.command_opaque_id);
 
         if (request.command == MAV_CMD_REQUEST_MESSAGE) {
             _receivedRequestMessageCountMap[static_cast<uint32_t>(request.param1)]++;
@@ -1271,6 +1272,7 @@ void MockLink::_updateIncomingMessageCounts(const mavlink_message_t &msg)
 
         _receivedMavCommandCountMap[static_cast<MAV_CMD>(request.command)]++;
         _receivedMavCommandByCompCountMap[static_cast<MAV_CMD>(request.command)][request.target_component]++;
+        _receivedCommandOpaqueIdMap[static_cast<MAV_CMD>(request.command)].append(request.command_opaque_id);
     }
 }
 
@@ -2221,33 +2223,23 @@ void MockLink::_handleInProgressCommandLong(const mavlink_command_long_t &reques
     }
 
     mavlink_message_t commandAck{};
-    (void) mavlink_msg_command_ack_pack_chan(
-        _vehicleSystemId,
-        _vehicleComponentId,
-        _outgoingMavlinkChannel,
-        &commandAck,
-        request.command,
-        MAV_RESULT_IN_PROGRESS,
-        1,  // progress
-        0,  // result_param2
-        0,  // target_system
-        0   // target_component
-    );
+    (void) mavlink_msg_command_ack_pack_chan(_vehicleSystemId, _vehicleComponentId, _outgoingMavlinkChannel,
+                                             &commandAck, request.command, MAV_RESULT_IN_PROGRESS,
+                                             1,  // progress
+                                             0,  // result_param2
+                                             0,  // target_system
+                                             0,  // target_component
+                                             _ackCommandOpaqueId(request.command_opaque_id));
     respondWithMavlinkMessage(commandAck);
 
     if (request.command != MockLink::MAV_CMD_MOCKLINK_RESULT_IN_PROGRESS_NO_ACK) {
-        (void) mavlink_msg_command_ack_pack_chan(
-            _vehicleSystemId,
-            _vehicleComponentId,
-            _outgoingMavlinkChannel,
-            &commandAck,
-            request.command,
-            commandResult,
-            0,  // progress
-            0,  // result_param2
-            0,  // target_system
-            0   // target_component
-        );
+        (void) mavlink_msg_command_ack_pack_chan(_vehicleSystemId, _vehicleComponentId, _outgoingMavlinkChannel,
+                                                 &commandAck, request.command, commandResult,
+                                                 0,  // progress
+                                                 0,  // result_param2
+                                                 0,  // target_system
+                                                 0,  // target_component
+                                                 _ackCommandOpaqueId(request.command_opaque_id));
         respondWithMavlinkMessage(commandAck);
     }
 }
@@ -2448,18 +2440,13 @@ void MockLink::_handleCommandLong(const mavlink_message_t &msg)
     }
 
     mavlink_message_t commandAck{};
-    (void) mavlink_msg_command_ack_pack_chan(
-        _vehicleSystemId,
-        _vehicleComponentId,
-        _outgoingMavlinkChannel,
-        &commandAck,
-        request.command,
-        commandResult,
-        0,    // progress
-        0,    // result_param2
-        0,    // target_system
-        0     // target_component
-    );
+    (void) mavlink_msg_command_ack_pack_chan(_vehicleSystemId, _vehicleComponentId, _outgoingMavlinkChannel,
+                                             &commandAck, request.command, commandResult,
+                                             0,  // progress
+                                             0,  // result_param2
+                                             0,  // target_system
+                                             0,  // target_component
+                                             _ackCommandOpaqueId(request.command_opaque_id));
     respondWithMavlinkMessage(commandAck);
 }
 
@@ -2502,36 +2489,26 @@ void MockLink::_handleCommandInt(const mavlink_message_t &msg)
     }
 
     mavlink_message_t commandAck{};
-    (void) mavlink_msg_command_ack_pack_chan(
-        _vehicleSystemId,
-        _vehicleComponentId,
-        _outgoingMavlinkChannel,
-        &commandAck,
-        request.command,
-        commandResult,
-        0,    // progress
-        0,    // result_param2
-        0,    // target_system
-        0     // target_component
-    );
+    (void) mavlink_msg_command_ack_pack_chan(_vehicleSystemId, _vehicleComponentId, _outgoingMavlinkChannel,
+                                             &commandAck, request.command, commandResult,
+                                             0,  // progress
+                                             0,  // result_param2
+                                             0,  // target_system
+                                             0,  // target_component
+                                             _ackCommandOpaqueId(request.command_opaque_id));
     respondWithMavlinkMessage(commandAck);
 }
 
-void MockLink::sendUnexpectedCommandAck(MAV_CMD command, MAV_RESULT ackResult)
+void MockLink::sendUnexpectedCommandAck(MAV_CMD command, MAV_RESULT ackResult, uint32_t commandOpaqueId)
 {
     mavlink_message_t commandAck{};
-    (void) mavlink_msg_command_ack_pack_chan(
-        _vehicleSystemId,
-        _vehicleComponentId,
-        _outgoingMavlinkChannel,
-        &commandAck,
-        command,
-        ackResult,
-        0,    // progress
-        0,    // result_param2
-        0,    // target_system
-        0     // target_component
-    );
+    (void) mavlink_msg_command_ack_pack_chan(_vehicleSystemId, _vehicleComponentId, _outgoingMavlinkChannel,
+                                             &commandAck, command, ackResult,
+                                             0,  // progress
+                                             0,  // result_param2
+                                             0,  // target_system
+                                             0,  // target_component
+                                             commandOpaqueId);
     respondWithMavlinkMessage(commandAck);
 }
 
