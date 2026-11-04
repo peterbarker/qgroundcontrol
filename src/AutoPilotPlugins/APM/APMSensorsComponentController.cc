@@ -454,17 +454,15 @@ void APMSensorsComponentController::nextClicked()
     if (sharedLink) {
         mavlink_message_t msg{};
 
-        (void) mavlink_msg_command_ack_pack_chan(
-            MAVLinkProtocol::instance()->getSystemId(),
-            MAVLinkProtocol::getComponentId(),
-            sharedLink->mavlinkChannel(),
-            &msg,
-            0,    // command
-            1,    // result
-            0,    // progress
-            0,    // result_param2
-            0,    // target_system
-            0     // target_component
+        (void) mavlink_msg_command_ack_pack_chan(MAVLinkProtocol::instance()->getSystemId(),
+                                                 MAVLinkProtocol::getComponentId(), sharedLink->mavlinkChannel(), &msg,
+                                                 0,  // command
+                                                 1,  // result
+                                                 0,  // progress
+                                                 0,  // result_param2
+                                                 0,  // target_system
+                                                 0,  // target_component
+                                                 0   // command_opaque_id
         );
 
         (void) _vehicle->sendMessageOnLinkThreadSafe(sharedLink.get(), msg);

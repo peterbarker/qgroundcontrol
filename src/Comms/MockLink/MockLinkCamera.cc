@@ -851,17 +851,13 @@ void MockLinkCamera::_sendCameraTrackingImageStatus(uint8_t compId)
 void MockLinkCamera::_sendCommandAck(uint8_t compId, uint16_t command, uint8_t result, int requestedMsgId)
 {
     mavlink_message_t msg{};
-    (void) mavlink_msg_command_ack_pack_chan(
-        _mockLink->vehicleId(),
-        compId,
-        _mockLink->outgoingMavlinkChannel(),
-        &msg,
-        command,
-        result,
-        0,   // progress
-        0,   // result_param2
-        0,   // target_system
-        0);  // target_component
+    (void) mavlink_msg_command_ack_pack_chan(_mockLink->vehicleId(), compId, _mockLink->outgoingMavlinkChannel(), &msg,
+                                             command, result,
+                                             0,   // progress
+                                             0,   // result_param2
+                                             0,   // target_system
+                                             0,   // target_component
+                                             0);  // command_opaque_id
     _mockLink->respondWithMavlinkMessage(msg);
 
     QString commandName = MissionCommandTree::instance()->rawName(static_cast<MAV_CMD>(command));
