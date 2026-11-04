@@ -16,8 +16,11 @@ class Vehicle;
 ///
 /// Each outbound command is appended to a per-vehicle queue with its retry policy
 /// and ack timeout. A periodic timer resends entries whose ack window has expired;
-/// incoming COMMAND_ACK messages are matched by (compId, command) and either complete
-/// the entry or refresh its timer on MAV_RESULT_IN_PROGRESS.
+/// incoming COMMAND_ACK messages are matched by command_opaque_id when the vehicle
+/// echoes one, otherwise by (compId, command), and either complete the entry or
+/// refresh its timer on MAV_RESULT_IN_PROGRESS.
+///
+/// Each command is sent with a non-zero command_opaque_id, which its retries reuse.
 ///
 class MavCommandQueue : public QObject, public VehicleTypes
 {
@@ -95,11 +98,14 @@ private:
         int                     tryCount            = 0;
         QElapsedTimer           elapsedTimer;
         int                     ackTimeoutMSecs     = 0;
+        uint32_t commandOpaqueId = 0;  ///< Sent with every try of this command
     } MavCommandListEntry_t;
 
     void sendCommandWithLambdaFallbackWorker(std::function<void()> lambda, bool commandInt, int compId, MAV_CMD command, MAV_FRAME frame, bool showError, float param1, float param2, float param3, float param4, double param5, double param6, float param7);
 
     void _sendFromList(int index);
+    int _findAckEntryIndex(int compId, const mavlink_command_ack_t& ack) const;
+    uint32_t _allocateCommandOpaqueId();
     static bool _shouldRetry(MAV_CMD command);
     static bool _canBeDuplicated(MAV_CMD command);
     static int _responseCheckIntervalMSecs();
@@ -110,6 +116,7 @@ private:
     QList<MavCommandListEntry_t>     _list;
     QTimer                           _responseCheckTimer;
     bool                             _stopped = false;  // set by stop(), gates all send paths
+    uint32_t _nextCommandOpaqueId = 0;
 
     static constexpr int _ackTimeoutMSecsDefault     = 1200;
     static constexpr int _ackTimeoutMSecsHighLatency = 120000;
