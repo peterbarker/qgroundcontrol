@@ -2496,15 +2496,13 @@ void Vehicle::startCalibration(QGCMAVLink::CalibrationType calType)
     // We can't use sendMavCommand here since we have no idea how long it will be before the command returns a result. This in turn
     // causes the retry logic to break down.
     mavlink_message_t msg;
-    mavlink_msg_command_long_pack_chan(MAVLinkProtocol::instance()->getSystemId(),
-                                       MAVLinkProtocol::getComponentId(),
-                                       sharedLink->mavlinkChannel(),
-                                       &msg,
-                                       id(),
-                                       defaultComponentId(),            // target component
-                                       MAV_CMD_PREFLIGHT_CALIBRATION,    // command id
-                                       0,                                // 0=first transmission of command
-                                       param1, param2, param3, param4, param5, param6, param7);
+    mavlink_msg_command_long_pack_chan(MAVLinkProtocol::instance()->getSystemId(), MAVLinkProtocol::getComponentId(),
+                                       sharedLink->mavlinkChannel(), &msg, id(),
+                                       defaultComponentId(),           // target component
+                                       MAV_CMD_PREFLIGHT_CALIBRATION,  // command id
+                                       0,                              // 0=first transmission of command
+                                       param1, param2, param3, param4, param5, param6, param7,
+                                       0);                             // command_opaque_id
     sendMessageOnLinkThreadSafe(sharedLink.get(), msg);
 }
 

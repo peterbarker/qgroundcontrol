@@ -30,6 +30,8 @@ target_sources(
         InitialConnectPeripheralStartupTest.h
         MAVLinkLogManagerTest.cc
         MAVLinkLogManagerTest.h
+        MavCommandOpaqueIdTest.cc
+        MavCommandOpaqueIdTest.h
         MavCommandQueueReentrancyTest.cc
         MavCommandQueueReentrancyTest.h
         MultiVehicleManagerTest.cc
@@ -103,6 +105,7 @@ add_qgc_test(GuidedModeROIAPMTest LABELS Integration Vehicle)
 add_qgc_test(InitialConnectTest LABELS Integration Vehicle)
 add_qgc_test(InitialConnectPeripheralStartupTest LABELS Integration Vehicle)
 add_qgc_test(MAVLinkLogManagerTest LABELS Integration Vehicle)
+add_qgc_test(MavCommandOpaqueIdTest LABELS Integration Vehicle)
 add_qgc_test(MavCommandQueueReentrancyTest LABELS Integration Vehicle)
 add_qgc_test(MultiVehicleManagerTest LABELS Integration Vehicle)
 add_qgc_test(PX4CalibrationStatusTextTest LABELS Integration Vehicle)

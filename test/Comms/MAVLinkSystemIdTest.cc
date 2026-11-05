@@ -124,7 +124,7 @@ void MAVLinkSystemIdTest::_connectWideVehicle()
     const auto injectCommand = [&](quint32 target, quint8 component) {
         mavlink_message_t message{};
         mavlink_msg_command_long_pack(systemId, MAV_COMP_ID_AUTOPILOT1, &message, target, component, 65535, 0, 0, 0, 0,
-                                      0, 0, 0, 0);
+                                      0, 0, 0, 0, 0);
         uint8_t buffer[MAVLINK_MAX_PACKET_LEN];
         const auto length = mavlink_msg_to_send_buffer(buffer, &message);
         MAVLinkProtocol::instance()->receiveBytes(_mockLink, QByteArray(reinterpret_cast<const char*>(buffer), length));

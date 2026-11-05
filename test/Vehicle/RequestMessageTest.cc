@@ -241,7 +241,7 @@ void RequestMessageTest::_staleAvailableModesIgnored()
     mavlink_message_t ack{};
     (void) mavlink_msg_command_ack_pack_chan(_mockLink->vehicleId(), MAV_COMP_ID_AUTOPILOT1,
                                              _mockLink->outgoingMavlinkChannel(), &ack, MAV_CMD_REQUEST_MESSAGE,
-                                             MAV_RESULT_ACCEPTED, 0, 0, 0, 0);
+                                             MAV_RESULT_ACCEPTED, 0, 0, 0, 0, 0);
     _mockLink->respondWithMavlinkMessage(ack);
     QVERIFY_TRUE_WAIT(vehicle->_findMavCommandListEntryIndex(MAV_COMP_ID_AUTOPILOT1, MAV_CMD_REQUEST_MESSAGE) == -1,
                       TestTimeout::shortMs());
