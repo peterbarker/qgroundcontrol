@@ -122,7 +122,11 @@ public:
     /// Called to send a MISSION_REQUEST message while the MissionManager is in idle state
     void sendUnexpectedMissionRequest() const { _missionItemHandler->sendUnexpectedMissionRequest(); }
 
-    void sendUnexpectedCommandAck(MAV_CMD command, MAV_RESULT ackResult);
+    void sendUnexpectedCommandAck(MAV_CMD command, MAV_RESULT ackResult, uint32_t commandOpaqueId = 0);
+
+    /// Echo the command_opaque_id of received commands in their COMMAND_ACKs (default). Turn off to simulate
+    /// firmware which doesn't support command_opaque_id and always sends 0.
+    void setEchoCommandOpaqueId(bool echo) { _echoCommandOpaqueId = echo; }
 
     /// Reset the state of the MissionItemHandler to no items, no transactions in progress.
     void resetMissionItemHandler() const { _missionItemHandler->reset(); }
@@ -136,7 +140,19 @@ public:
     /// Vehicle-side channel used to encode outgoing (mock vehicle -> QGC) messages. Signing state lives here.
     uint8_t outgoingMavlinkChannel() const { return _outgoingMavlinkChannel; }
 
-    void clearReceivedMavCommandCounts() { _receivedMavCommandCountMap.clear(); _receivedMavCommandByCompCountMap.clear(); _receivedRequestMessageByCompAndMsgCountMap.clear(); }
+    void clearReceivedMavCommandCounts()
+    {
+        _receivedMavCommandCountMap.clear();
+        _receivedMavCommandByCompCountMap.clear();
+        _receivedRequestMessageByCompAndMsgCountMap.clear();
+        _receivedCommandOpaqueIdMap.clear();
+    }
+
+    /// command_opaque_id of each COMMAND_LONG / COMMAND_INT received for this command, in order received
+    QList<uint32_t> receivedCommandOpaqueIds(MAV_CMD command) const
+    {
+        return _receivedCommandOpaqueIdMap.value(command);
+    }
     int receivedMavCommandCount(MAV_CMD command) const { return _receivedMavCommandCountMap.value(command, 0); }
     int receivedMavCommandCount(MAV_CMD command, int compId) const { return _receivedMavCommandByCompCountMap.value(command).value(compId, 0); }
     int receivedRequestMessageCount(int compId, int messageId) const { return _receivedRequestMessageByCompAndMsgCountMap.value(compId).value(messageId, 0); }
@@ -603,6 +619,13 @@ private:
 
     QMap<MAV_CMD, int> _receivedMavCommandCountMap;
     QMap<MAV_CMD, QMap<int, int>> _receivedMavCommandByCompCountMap;
+    QMap<MAV_CMD, QList<uint32_t>> _receivedCommandOpaqueIdMap;
+    bool _echoCommandOpaqueId = true;
+
+    uint32_t _ackCommandOpaqueId(uint32_t requestCommandOpaqueId) const
+    {
+        return _echoCommandOpaqueId ? requestCommandOpaqueId : 0;
+    }
     QMap<uint32_t, int> _receivedRequestMessageCountMap;
     QMap<int, QMap<int, int>> _receivedRequestMessageByCompAndMsgCountMap;
     QMap<uint32_t, int> _receivedMavlinkMessageCountMap;

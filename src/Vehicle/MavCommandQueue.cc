@@ -1,5 +1,6 @@
 #include "MavCommandQueue.h"
 
+#include <QtCore/QRandomGenerator>
 #include <QtCore/QTimer>
 
 #include "AppMessages.h"
@@ -23,6 +24,8 @@ std::optional<int> MavCommandQueue::_testAckTimeoutOverride;
 MavCommandQueue::MavCommandQueue(Vehicle* vehicle)
     : QObject(vehicle)
     , _vehicle(vehicle)
+    // A random start makes it unlikely that a restarted QGC re-uses an ID the vehicle still remembers
+    , _nextCommandOpaqueId(QRandomGenerator::global()->generate())
 {
     _responseCheckTimer.setSingleShot(false);
     _responseCheckTimer.setInterval(_responseCheckIntervalMSecs());
@@ -210,6 +213,32 @@ int MavCommandQueue::findEntryIndex(int targetCompId, MAV_CMD command) const
     return -1;
 }
 
+int MavCommandQueue::_findAckEntryIndex(int compId, const mavlink_command_ack_t& ack) const
+{
+    if (ack.command_opaque_id == 0) {
+        // Firmware which doesn't support command_opaque_id
+        return findEntryIndex(compId, static_cast<MAV_CMD>(ack.command));
+    }
+
+    for (int i = 0; i < _list.count(); i++) {
+        const MavCommandListEntry_t& entry = _list[i];
+        if (entry.commandOpaqueId == ack.command_opaque_id && entry.targetCompId == compId &&
+            entry.command == static_cast<MAV_CMD>(ack.command)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+uint32_t MavCommandQueue::_allocateCommandOpaqueId()
+{
+    // 0 means "not set"
+    if (_nextCommandOpaqueId == 0) {
+        _nextCommandOpaqueId++;
+    }
+    return _nextCommandOpaqueId++;
+}
+
 int MavCommandQueue::_responseCheckIntervalMSecs()
 {
     // Use shorter check interval during unit tests for faster test execution
@@ -372,6 +401,7 @@ void MavCommandQueue::sendWorker(bool commandInt, bool showError,
     entry.rgParam7          = param7;
     entry.maxTries          = _shouldRetry(command) ? kMaxRetryCount : 1;
     entry.ackTimeoutMSecs   = sharedLink->linkConfiguration()->isHighLatency() ? _ackTimeoutMSecsHighLatency : _ackTimeoutMSecs();
+    entry.commandOpaqueId = _allocateCommandOpaqueId();
     entry.elapsedTimer.start();
 
     qCDebug(MavCommandQueueLog) << "Sending" << _formatCommand(command, param1) << "param1-7:" << command << param1 << param2 << param3 << param4 << param5 << param6 << param7;
@@ -420,7 +450,10 @@ void MavCommandQueue::_sendFromList(int index)
     }
 
     qCDebug(MavCommandQueueLog) << "Sending" << _formatCommand(commandEntry.command, commandEntry.rgParam1)
-                                << "tryCount:param1-7" << commandEntry.tryCount << commandEntry.rgParam1 << commandEntry.rgParam2 << commandEntry.rgParam3 << commandEntry.rgParam4 << commandEntry.rgParam5 << commandEntry.rgParam6 << commandEntry.rgParam7;
+                                << "tryCount:param1-7" << commandEntry.tryCount << commandEntry.rgParam1
+                                << commandEntry.rgParam2 << commandEntry.rgParam3 << commandEntry.rgParam4
+                                << commandEntry.rgParam5 << commandEntry.rgParam6 << commandEntry.rgParam7
+                                << "command_opaque_id:" << commandEntry.commandOpaqueId;
 
     SharedLinkInterfacePtr sharedLink = _vehicle->vehicleLinkManager()->primaryLink().lock();
     if (!sharedLink) {
@@ -446,7 +479,7 @@ void MavCommandQueue::_sendFromList(int index)
         mavlink_msg_command_int_pack_chan(MAVLinkProtocol::instance()->getSystemId(), MAVLinkProtocol::getComponentId(),
                                           sharedLink->mavlinkChannel(), &msg, _vehicle->id(), cmd.target_component,
                                           cmd.frame, cmd.command, cmd.current, cmd.autocontinue, cmd.param1, cmd.param2,
-                                          cmd.param3, cmd.param4, cmd.x, cmd.y, cmd.z);
+                                          cmd.param3, cmd.param4, cmd.x, cmd.y, cmd.z, commandEntry.commandOpaqueId);
     } else {
         mavlink_command_long_t cmd;
         memset(&cmd, 0, sizeof(cmd));
@@ -464,7 +497,7 @@ void MavCommandQueue::_sendFromList(int index)
         mavlink_msg_command_long_pack_chan(
             MAVLinkProtocol::instance()->getSystemId(), MAVLinkProtocol::getComponentId(), sharedLink->mavlinkChannel(),
             &msg, _vehicle->id(), cmd.target_component, cmd.command, cmd.confirmation, cmd.param1, cmd.param2,
-            cmd.param3, cmd.param4, cmd.param5, cmd.param6, cmd.param7);
+            cmd.param3, cmd.param4, cmd.param5, cmd.param6, cmd.param7, commandEntry.commandOpaqueId);
     }
 
     _vehicle->sendMessageOnLinkThreadSafe(sharedLink.get(), msg);
@@ -523,10 +556,11 @@ void MavCommandQueue::showCommandAckError(const mavlink_command_ack_t& ack)
 
 void MavCommandQueue::handleCommandAck(const mavlink_message_t& message, const mavlink_command_ack_t& ack)
 {
-    int entryIndex = findEntryIndex(message.compid, static_cast<MAV_CMD>(ack.command));
+    int entryIndex = _findAckEntryIndex(message.compid, ack);
     if (entryIndex == -1) {
         QString rawCommandName = MissionCommandTree::instance()->rawName(static_cast<MAV_CMD>(ack.command));
-        qCDebug(MavCommandQueueLog) << "handleCommandAck Ack not in list" << rawCommandName;
+        qCDebug(MavCommandQueueLog) << "handleCommandAck Ack not in list" << rawCommandName
+                                    << "command_opaque_id:" << ack.command_opaque_id;
         return;
     }
 
