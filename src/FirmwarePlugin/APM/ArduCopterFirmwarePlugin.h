@@ -65,6 +65,7 @@ public:
 
 protected:
     uint32_t _convertToCustomFlightModeEnum(uint32_t val) const override;
+    QList<int> _fenceBreachActions() const override;
 
 private:
     const QString _stabilizeFlightMode = tr("Stabilize");

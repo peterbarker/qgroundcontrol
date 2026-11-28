@@ -12,6 +12,7 @@
 #include "MissionController.h"
 #include "ParameterManager.h"
 #include "PlanMasterController.h"
+#include "QGCFenceBreachActions.h"
 #include "QGCFenceCircle.h"
 #include "QGCFencePolygon.h"
 #include "QGCLoggingCategory.h"
@@ -39,6 +40,8 @@ GeoFenceController::GeoFenceController(PlanMasterController* masterController, Q
     connect(&_polygons, &QmlObjectListModel::countChanged, this, &GeoFenceController::containsItemsChanged);
     connect(&_circles,  &QmlObjectListModel::countChanged, this, &GeoFenceController::containsItemsChanged);
     connect(&_circles, &QmlObjectListModel::countChanged, this, &GeoFenceController::hasHomeCircleChanged);
+    connect(&_polygons, &QmlObjectListModel::countChanged, this, &GeoFenceController::hasBreachActionsChanged);
+    connect(&_circles,  &QmlObjectListModel::countChanged, this, &GeoFenceController::hasBreachActionsChanged);
 
     connect(this,                       &GeoFenceController::breachReturnPointChanged,  this, &GeoFenceController::_setDirty);
     connect(&_breachReturnAltitudeFact, &Fact::rawValueChanged,                         this, &GeoFenceController::_setDirty);
@@ -106,12 +109,15 @@ void GeoFenceController::_managerVehicleChanged(Vehicle* managerVehicle)
     });
     (void) connect(_managerVehicle, &Vehicle::firmwareVersionChanged, this,
                    &GeoFenceController::homeCircleSupportedChanged);
+    (void) connect(_managerVehicle, &Vehicle::firmwareVersionChanged, this,
+                   &GeoFenceController::breachActionsSupportedChanged);
 
     connect(_managerVehicle->parameterManager(), &ParameterManager::parametersReadyChanged, this, &GeoFenceController::_parametersReady);
     _parametersReady();
 
     emit supportedChanged(supported());
     emit homeCircleSupportedChanged();
+    emit breachActionsSupportedChanged();
 }
 
 bool GeoFenceController::load(const QJsonObject& json, QString& errorString)
@@ -152,7 +158,7 @@ bool GeoFenceController::load(const QJsonObject& json, QString& errorString)
         if (!fencePolygon->loadFromJson(jsonPolygonValue.toObject(), true /* required */, errorString)) {
             return false;
         }
-        _polygons.append(fencePolygon);
+        _appendPolygon(fencePolygon);
     }
 
     QJsonArray jsonCircleArray = json[_jsonCirclesKey].toArray();
@@ -303,7 +309,7 @@ void GeoFenceController::_setFenceFromManager(const QList<QGCFencePolygon>& poly
     _circles.clearAndDeleteContents();
 
     for (int i=0; i<polygons.count(); i++) {
-        _polygons.append(new QGCFencePolygon(polygons[i], this));
+        _appendPolygon(new QGCFencePolygon(polygons[i], this));
     }
 
     for (int i=0; i<circles.count(); i++) {
@@ -414,7 +420,7 @@ void GeoFenceController::addInclusionPolygon(QGeoCoordinate topLeft, QGeoCoordin
     polygon->appendVertex(topRight);
     polygon->appendVertex(bottomRight);
     polygon->appendVertex(bottomLeft);
-    _polygons.append(polygon);
+    _appendPolygon(polygon);
 
     clearAllInteractive();
     polygon->setInteractive(true);
@@ -495,7 +501,86 @@ void GeoFenceController::_appendCircle(QGCFenceCircle* circle)
 {
     connect(circle, &QGCFenceCircle::homeCenteredChanged, this, &GeoFenceController::_updateHomeCircleCenters);
     connect(circle, &QGCFenceCircle::homeCenteredChanged, this, &GeoFenceController::hasHomeCircleChanged);
+    connect(circle, &QGCFenceCircle::breachActionsChanged, this, &GeoFenceController::hasBreachActionsChanged);
     _circles.append(circle);
+}
+
+void GeoFenceController::_appendPolygon(QGCFencePolygon* polygon)
+{
+    connect(polygon, &QGCFencePolygon::breachActionsChanged, this, &GeoFenceController::hasBreachActionsChanged);
+    _polygons.append(polygon);
+}
+
+QList<int> GeoFenceController::_supportedBreachActions(void) const
+{
+    if (!_managerVehicle) {
+        return {};
+    }
+    return _managerVehicle->firmwarePlugin()->supportedFenceBreachActions(_managerVehicle);
+}
+
+bool GeoFenceController::breachActionsSupported(void) const
+{
+    return !_supportedBreachActions().isEmpty();
+}
+
+QVariantList GeoFenceController::breachActionChoices(void) const
+{
+    QVariantList choices;
+    for (const int action : _supportedBreachActions()) {
+        choices.append(QVariantMap{{QStringLiteral("value"), action},
+                                   {QStringLiteral("text"), QGCFenceBreachActions::name(action)}});
+    }
+    return choices;
+}
+
+QString GeoFenceController::breachActionName(int action) const
+{
+    return QGCFenceBreachActions::name(action);
+}
+
+QString GeoFenceController::breachActionsDescription(const QList<int>& actions) const
+{
+    return QGCFenceBreachActions::describe(actions);
+}
+
+bool GeoFenceController::hasBreachActions(void) const
+{
+    for (int i = 0; i < _polygons.count(); i++) {
+        if (!_polygons.value<QGCFencePolygon*>(i)->breachActions().isEmpty()) {
+            return true;
+        }
+    }
+    for (int i = 0; i < _circles.count(); i++) {
+        if (!_circles.value<QGCFenceCircle*>(i)->breachActions().isEmpty()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool GeoFenceController::breachActionsUploadable(void) const
+{
+    const QList<int> supported = _supportedBreachActions();
+    const auto allSupported = [&supported](const QList<int>& actions) {
+        for (const int action : actions) {
+            if (!supported.contains(action)) {
+                return false;
+            }
+        }
+        return true;
+    };
+    for (int i = 0; i < _polygons.count(); i++) {
+        if (!allSupported(_polygons.value<QGCFencePolygon*>(i)->breachActions())) {
+            return false;
+        }
+    }
+    for (int i = 0; i < _circles.count(); i++) {
+        if (!allSupported(_circles.value<QGCFenceCircle*>(i)->breachActions())) {
+            return false;
+        }
+    }
+    return true;
 }
 
 void GeoFenceController::_updateHomeCircleCenters(void)

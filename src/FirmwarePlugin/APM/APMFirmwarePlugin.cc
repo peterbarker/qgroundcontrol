@@ -653,6 +653,14 @@ bool APMFirmwarePlugin::supportsFenceHomeCircle(const Vehicle* vehicle) const
     return vehicle && (vehicle->versionCompare(4, 8, 0) >= 0);
 }
 
+QList<int> APMFirmwarePlugin::supportedFenceBreachActions(const Vehicle* vehicle) const
+{
+    if (!vehicle || (vehicle->versionCompare(4, 8, 0) < 0)) {
+        return {};
+    }
+    return _fenceBreachActions();
+}
+
 const QVariantList &APMFirmwarePlugin::toolIndicators(const Vehicle *vehicle)
 {
     if (_toolIndicatorList.isEmpty()) {

@@ -22,6 +22,7 @@ qt_add_qml_module(
         CameraSection.qml
         CorridorScanEditor.qml
         CorridorScanMapVisual.qml
+        FenceBreachActionEditor.qml
         FenceTabPage.qml
         FenceInspector.qml
         FenceItemList.qml

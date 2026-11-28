@@ -37,6 +37,11 @@ You can create multiple regions by pressing the buttons multiple times, allowing
 1. Check a circular region's _Center on home_ checkbox to keep it centred on the vehicle home position.
    The checkbox is offered when connected to a vehicle whose firmware supports these circles.
 
+1. Set a region's _Breach action_ to choose what the vehicle does when it breaches that region, instead of the action
+   configured on the vehicle. Once an action is set, a _Fallback action_ (and then a _Second fallback_) can be chosen,
+   which the vehicle tries if it cannot take the action before it (for example RTL without a home position).
+   The actions offered are those the vehicle's firmware supports, and only when connected to such a vehicle.
+
 Depending on the firmware, the GeoFence section may also show fence parameters (e.g. breach action) and a **Breach Return Point** that the vehicle will fly to if it breaches the fence.
 
 ## Edit/Delete a GeoFence

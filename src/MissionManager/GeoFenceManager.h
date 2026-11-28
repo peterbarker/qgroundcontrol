@@ -48,6 +48,7 @@ public:
         UnsupportedCommand,     ///< Usupported command in mission type
         BadPolygonItemFormat,   ///< Error re-creating polygons from mission items
         InvalidCircleRadius,
+        BadBreachActionItem,    ///< MAV_CMD_NAV_SET_FENCE_ACTION not followed by a polygon or circle
     } ErrorCode_t;
 
 signals:
@@ -63,6 +64,7 @@ private slots:
 
 private:
     void _sendError(ErrorCode_t errorCode, const QString& errorMsg);
+    void _appendBreachActionItem(const QList<int>& breachActions, QList<MissionItem*>& fenceItems);
 
     QList<QGCFencePolygon>  _polygons;
     QList<QGCFenceCircle>   _circles;

@@ -283,6 +283,10 @@ public:
     /// Returns true if the firmware accepts MAV_CMD_NAV_FENCE_HOME_CIRCLE_INCLUSION fence items. Default is false.
     virtual bool supportsFenceHomeCircle(const Vehicle* /*vehicle*/) const { return false; }
 
+    /// Returns the FENCE_ACTION values the firmware accepts in MAV_CMD_NAV_SET_FENCE_ACTION fence items,
+    /// excluding FENCE_ACTION_DEFAULT. Default is none: the item is not supported.
+    virtual QList<int> supportedFenceBreachActions(const Vehicle* /*vehicle*/) const { return {}; }
+
     /// Called before any mavlink message is processed by Vehicle such that the firmwre plugin
     /// can adjust any message characteristics. This is handy to adjust or differences in mavlink
     /// spec implementations such that the base code can remain mavlink generic.

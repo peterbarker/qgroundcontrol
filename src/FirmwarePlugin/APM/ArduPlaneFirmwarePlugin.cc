@@ -194,3 +194,10 @@ uint32_t ArduPlaneFirmwarePlugin::_convertToCustomFlightModeEnum(uint32_t val) c
         return UINT32_MAX;
     }
 }
+
+QList<int> ArduPlaneFirmwarePlugin::_fenceBreachActions() const
+{
+    // Land needs a QuadPlane or the AUTOLAND mode; firmware without either rejects it on upload
+    return {FENCE_ACTION_REPORT, FENCE_ACTION_HOLD, FENCE_ACTION_GOTO_RETURN_POINT, FENCE_ACTION_RTL,
+            FENCE_ACTION_LAND};
+}

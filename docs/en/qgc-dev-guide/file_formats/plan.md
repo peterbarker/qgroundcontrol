@@ -425,6 +425,7 @@ A circle that the vehicle centres on its home position (`MAV_CMD_NAV_FENCE_HOME_
 version 2 with an additional `"homeCentered": true` key, so that readers which only understand version 1 reject it
 rather than loading it as a fixed circle. Such circles are always inclusion fences and their saved `center` is ignored.
 A circle whose version and `homeCentered` key do not agree is rejected.
+A circle with [breach actions](#geofence_breach_actions) is written as version 3, with or without `homeCentered`.
 
 ### Polygon Geofence {#polygon_geofence}
 
@@ -463,9 +464,23 @@ The fields are:
 
 | Key         | Description                                                                                                                    |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `version`   | The version number for the geofence "polygon" plan format. The documented version is 2.                                        |
+| `version`   | The version number for the geofence "polygon" plan format. The documented version is 1.                                        |
 | `polygon`   | A list of points for the polygon. Each point contains a latitude and longitude. The points are ordered in a clockwise winding. |
 | `inclusion` | `true`: inclusion fence; `false`: exclusion fence.                                                                             |
+
+A polygon with [breach actions](#geofence_breach_actions) is written as version 2.
+
+### Breach Actions {#geofence_breach_actions}
+
+A polygon or circle may carry a `breachActions` key: a list of one to three
+[`FENCE_ACTION`](https://mavlink.io/en/messages/development.html#FENCE_ACTION) values (none of them
+`FENCE_ACTION_DEFAULT`), tried in order when that fence is breached. For example `"breachActions": [5, 6]` means RTL,
+or Land if the vehicle cannot RTL. They are sent to the vehicle in a `MAV_CMD_NAV_SET_FENCE_ACTION` item just before
+the fence. A fence without the key uses the breach action configured on the vehicle.
+
+Fences with breach actions are written with a higher version (polygon 2, circle 3) so that readers which do not
+understand the key reject them rather than dropping the actions. A fence whose version and `breachActions` key do not
+agree is rejected.
 
 ## Rally Points {#rally_points}
 

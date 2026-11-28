@@ -38,6 +38,21 @@ public:
     /// true: at least one circle is centered on the vehicle home position
     Q_PROPERTY(bool hasHomeCircle READ hasHomeCircle NOTIFY hasHomeCircleChanged)
 
+    /// true: firmware supports per-area breach actions (MAV_CMD_NAV_SET_FENCE_ACTION)
+    Q_PROPERTY(bool breachActionsSupported READ breachActionsSupported NOTIFY breachActionsSupportedChanged)
+
+    /// Breach actions the firmware supports, as a list of { value: FENCE_ACTION, text: name }
+    Q_PROPERTY(QVariantList breachActionChoices READ breachActionChoices NOTIFY breachActionsSupportedChanged)
+
+    /// true: at least one polygon or circle has breach actions
+    Q_PROPERTY(bool hasBreachActions READ hasBreachActions NOTIFY hasBreachActionsChanged)
+
+    /// Display name of a FENCE_ACTION value
+    Q_INVOKABLE QString breachActionName(int action) const;
+
+    /// Names of breach actions in the order they are tried, e.g. "RTL > Land"
+    Q_INVOKABLE QString breachActionsDescription(const QList<int>& actions) const;
+
     /// Add a new inclusion polygon to the fence
     ///     @param topLeft: Top left coordinate or map viewport
     ///     @param bottomRight: Bottom right left coordinate or map viewport
@@ -62,6 +77,11 @@ public:
     double  paramCircularFence  (void);
     bool homeCircleSupported(void) const;
     bool hasHomeCircle(void) const;
+    bool breachActionsSupported(void) const;
+    QVariantList breachActionChoices(void) const;
+    bool hasBreachActions(void) const;
+    /// true: every breach action in the fence is one the firmware supports
+    bool breachActionsUploadable(void) const;
     Fact*   breachReturnAltitude(void) { return &_breachReturnAltitudeFact; }
 
     // Overrides from PlanElementController
@@ -93,6 +113,8 @@ signals:
     void paramCircularFenceChanged      (void);
     void homeCircleSupportedChanged(void);
     void hasHomeCircleChanged(void);
+    void breachActionsSupportedChanged(void);
+    void hasBreachActionsChanged(void);
 
 private slots:
     void _fenceListDirtyChanged     (bool dirty);
@@ -109,6 +131,8 @@ private slots:
 private:
     void _init(void);
     void _appendCircle(QGCFenceCircle* circle);
+    void _appendPolygon(QGCFencePolygon* polygon);
+    QList<int> _supportedBreachActions(void) const;
 
     Vehicle*            _managerVehicle =               nullptr;
     GeoFenceManager*    _geoFenceManager =              nullptr;

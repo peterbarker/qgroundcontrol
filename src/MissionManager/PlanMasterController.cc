@@ -344,6 +344,14 @@ void PlanMasterController::sendToVehicle(void)
         if (_deleteWhenSendCompleted) {
             deleteLater();
         }
+    } else if (_geoFenceController.supported() && !_geoFenceController.breachActionsUploadable()) {
+        // Refuse before sending anything, rather than failing part way through the upload sequence
+        QGC::showAppMessage(
+            tr("This vehicle does not support some of the breach actions set on GeoFence areas. "
+               "Change or clear those breach actions, then upload again."));
+        if (_deleteWhenSendCompleted) {
+            deleteLater();
+        }
     } else {
         qCDebug(PlanMasterControllerLog) << "PlanMasterController::sendToVehicle start mission sendToVehicle";
         _sendSequence = SyncSequence::Mission;

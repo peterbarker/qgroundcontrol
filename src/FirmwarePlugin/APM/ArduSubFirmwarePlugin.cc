@@ -282,3 +282,8 @@ QMap<QString, FactGroup*>* ArduSubFirmwarePlugin::factGroups()
 {
     return &_nameToFactGroupMap;
 }
+
+QList<int> ArduSubFirmwarePlugin::_fenceBreachActions() const
+{
+    return {FENCE_ACTION_REPORT};
+}

@@ -15,6 +15,7 @@
 #include "MissionItem.h"
 #include "PlanMasterController.h"
 #include "QGCFenceCircle.h"
+#include "QGCFencePolygon.h"
 #include "QmlObjectListModel.h"
 #include "UnitTestCoords.h"
 #include "Vehicle.h"
@@ -34,6 +35,18 @@ QGCFenceCircle* addCircle(GeoFenceController* controller)
     controller->addInclusionCircle(center.atDistanceAndAzimuth(300, 315), center.atDistanceAndAzimuth(300, 135));
     return controller->circles()->value<QGCFenceCircle*>(controller->circles()->count() - 1);
 }
+
+/// Adds a polygon away from home and returns it
+QGCFencePolygon* addPolygon(GeoFenceController* controller)
+{
+    const QGeoCoordinate center = home2D().atDistanceAndAzimuth(1000, 270);
+    controller->addInclusionPolygon(center.atDistanceAndAzimuth(300, 315), center.atDistanceAndAzimuth(300, 135));
+    return controller->polygons()->value<QGCFencePolygon*>(controller->polygons()->count() - 1);
+}
+
+/// Breach actions ArduCopter accepts (MockLink's default vehicle is a quadrotor)
+const QList<int> copterBreachActions = {FENCE_ACTION_REPORT, FENCE_ACTION_HOLD, FENCE_ACTION_SMART_RTL,
+                                        FENCE_ACTION_RTL,    FENCE_ACTION_LAND, FENCE_ACTION_DESCEND};
 
 }  // namespace
 
@@ -240,6 +253,265 @@ void GeoFenceControllerTest::_testCircleJsonVersionMatchesHomeCentered()
     if (loads) {
         QCOMPARE(circle.homeCentered(), keyValue);
         QCOMPARE(circle.inclusion(), keyValue);
+    } else {
+        QVERIFY(!errorString.isEmpty());
+    }
+}
+
+void GeoFenceControllerTest::_testBreachActionsSupportedVersion_data()
+{
+    QTest::addColumn<int>("major");
+    QTest::addColumn<int>("minor");
+    QTest::addColumn<bool>("supported");
+
+    QTest::newRow("4.7") << 4 << 7 << false;
+    QTest::newRow("4.8") << 4 << 8 << true;
+}
+
+void GeoFenceControllerTest::_testBreachActionsSupportedVersion()
+{
+    QFETCH(int, major);
+    QFETCH(int, minor);
+    QFETCH(bool, supported);
+
+    GeoFenceController* const controller = geoFenceController();
+    QSignalSpy spy(controller, &GeoFenceController::breachActionsSupportedChanged);
+    vehicle()->setFirmwareVersion(major, minor, 0);
+    QVERIFY(spy.count() >= 1);
+    QCOMPARE(controller->breachActionsSupported(), supported);
+    QVERIFY(vehicle()->firmwarePlugin()->supportedFenceBreachActions(nullptr).isEmpty());
+
+    QList<int> choices;
+    for (const QVariant& choice : controller->breachActionChoices()) {
+        const QVariantMap map = choice.toMap();
+        QVERIFY(!map.value(QStringLiteral("text")).toString().isEmpty());
+        choices.append(map.value(QStringLiteral("value")).toInt());
+    }
+    QCOMPARE(choices, supported ? copterBreachActions : QList<int>());
+}
+
+void GeoFenceControllerTest::_testSetBreachAction()
+{
+    QGCFencePolygon* const polygon = addPolygon(geoFenceController());
+    QSignalSpy hasSpy(geoFenceController(), &GeoFenceController::hasBreachActionsChanged);
+
+    // A fallback needs the action before it
+    polygon->setBreachAction(1, FENCE_ACTION_LAND);
+    QVERIFY(polygon->breachActions().isEmpty());
+    QVERIFY(!geoFenceController()->hasBreachActions());
+
+    polygon->setBreachAction(0, FENCE_ACTION_RTL);
+    polygon->setBreachAction(1, FENCE_ACTION_LAND);
+    polygon->setBreachAction(2, FENCE_ACTION_DESCEND);
+    polygon->setBreachAction(3, FENCE_ACTION_REPORT);
+    QCOMPARE(polygon->breachActions(), QList<int>({FENCE_ACTION_RTL, FENCE_ACTION_LAND, FENCE_ACTION_DESCEND}));
+    QVERIFY(geoFenceController()->hasBreachActions());
+    QVERIFY(hasSpy.count() >= 1);
+    QCOMPARE(geoFenceController()->breachActionsDescription(polygon->breachActions()),
+             QStringLiteral("RTL > Land > Descend"));
+
+    // Replacing keeps the fallbacks; clearing a level drops the ones after it
+    polygon->setBreachAction(0, FENCE_ACTION_SMART_RTL);
+    QCOMPARE(polygon->breachActions(), QList<int>({FENCE_ACTION_SMART_RTL, FENCE_ACTION_LAND, FENCE_ACTION_DESCEND}));
+    polygon->setBreachAction(1, FENCE_ACTION_DEFAULT);
+    QCOMPARE(polygon->breachActions(), QList<int>({FENCE_ACTION_SMART_RTL}));
+    polygon->setBreachAction(0, FENCE_ACTION_DEFAULT);
+    QVERIFY(polygon->breachActions().isEmpty());
+    QVERIFY(!geoFenceController()->hasBreachActions());
+
+    // Lists are cut at the first default and to three actions
+    polygon->setBreachActions({FENCE_ACTION_RTL, FENCE_ACTION_DEFAULT, FENCE_ACTION_LAND});
+    QCOMPARE(polygon->breachActions(), QList<int>({FENCE_ACTION_RTL}));
+    polygon->setBreachActions({FENCE_ACTION_HOLD, FENCE_ACTION_RTL, FENCE_ACTION_LAND, FENCE_ACTION_DESCEND});
+    QCOMPARE(polygon->breachActions(), QList<int>({FENCE_ACTION_HOLD, FENCE_ACTION_RTL, FENCE_ACTION_LAND}));
+}
+
+void GeoFenceControllerTest::_testBreachActionsVehicleRoundTrip()
+{
+    GeoFenceController* const controller = geoFenceController();
+    missionController()->setHomePosition(TestFixtures::Coord::zurich());
+
+    QGCFencePolygon* const polygon = addPolygon(controller);
+    polygon->setBreachActions({FENCE_ACTION_RTL, FENCE_ACTION_LAND});
+    const int vertexCount = polygon->count();
+    addCircle(controller)->setBreachActions({FENCE_ACTION_HOLD});
+    addCircle(controller);
+
+    GeoFenceManager* const manager = vehicle()->geoFenceManager();
+    QSignalSpy sendSpy(manager, &GeoFenceManager::sendComplete);
+    controller->sendToVehicle();
+    QTRY_COMPARE_WITH_TIMEOUT(sendSpy.count(), 1, TestTimeout::mediumMs());
+    QCOMPARE(sendSpy.takeFirst().at(0).toBool(), false);
+
+    QSignalSpy loadSpy(controller, &GeoFenceController::loadComplete);
+    controller->loadFromVehicle();
+    QTRY_COMPARE_WITH_TIMEOUT(loadSpy.count(), 1, TestTimeout::mediumMs());
+
+    // Each action item sits just before the fence it applies to
+    const QList<MissionItem*>& items = manager->missionItems();
+    QCOMPARE(items.count(), 1 + vertexCount + 1 + 1 + 1);
+    QCOMPARE(items[0]->command(), MAV_CMD_NAV_SET_FENCE_ACTION);
+    QCOMPARE(items[0]->frame(), MAV_FRAME_GLOBAL);
+    QCOMPARE(items[0]->param1(), static_cast<double>(FENCE_ACTION_RTL));
+    QCOMPARE(items[0]->param2(), static_cast<double>(FENCE_ACTION_LAND));
+    QCOMPARE(items[0]->param3(), static_cast<double>(FENCE_ACTION_DEFAULT));
+    QCOMPARE(items[1]->command(), MAV_CMD_NAV_FENCE_POLYGON_VERTEX_INCLUSION);
+    const int circleAction = 1 + vertexCount;
+    QCOMPARE(items[circleAction]->command(), MAV_CMD_NAV_SET_FENCE_ACTION);
+    QCOMPARE(items[circleAction]->param1(), static_cast<double>(FENCE_ACTION_HOLD));
+    QCOMPARE(items[circleAction]->param2(), static_cast<double>(FENCE_ACTION_DEFAULT));
+    QCOMPARE(items[circleAction + 1]->command(), MAV_CMD_NAV_FENCE_CIRCLE_INCLUSION);
+    QCOMPARE(items[circleAction + 2]->command(), MAV_CMD_NAV_FENCE_CIRCLE_INCLUSION);
+
+    QCOMPARE(controller->polygons()->count(), 1);
+    QCOMPARE(controller->polygons()->value<QGCFencePolygon*>(0)->count(), vertexCount);
+    QCOMPARE(controller->polygons()->value<QGCFencePolygon*>(0)->breachActions(),
+             QList<int>({FENCE_ACTION_RTL, FENCE_ACTION_LAND}));
+    QCOMPARE(controller->circles()->count(), 2);
+    QCOMPARE(controller->circles()->value<QGCFenceCircle*>(0)->breachActions(), QList<int>({FENCE_ACTION_HOLD}));
+    QVERIFY(controller->circles()->value<QGCFenceCircle*>(1)->breachActions().isEmpty());
+    QVERIFY(!controller->dirty());
+}
+
+void GeoFenceControllerTest::_testUploadRefusedWhenBreachActionUnsupported()
+{
+    GeoFenceController* const controller = geoFenceController();
+    QGCFencePolygon* const polygon = addPolygon(controller);
+
+    // Copter has no terminate action
+    vehicle()->setFirmwareVersion(4, 8, 0);
+    polygon->setBreachActions({FENCE_ACTION_RTL, FENCE_ACTION_TERMINATE});
+    QVERIFY(!controller->breachActionsUploadable());
+    expectAppMessage(QRegularExpression(QStringLiteral("does not support some of the breach actions")));
+    planController()->sendToVehicle();
+    verifyExpectedLogMessage();
+    QVERIFY(!planController()->syncInProgress());
+    QVERIFY(vehicle()->geoFenceManager()->missionItems().isEmpty());
+
+    polygon->setBreachActions({FENCE_ACTION_RTL});
+    QVERIFY(controller->breachActionsUploadable());
+
+    // Older firmware supports none
+    vehicle()->setFirmwareVersion(4, 7, 0);
+    QVERIFY(!controller->breachActionsUploadable());
+    polygon->setBreachActions({});
+    QVERIFY(controller->breachActionsUploadable());
+}
+
+void GeoFenceControllerTest::_testBreachActionsJsonRoundTrip()
+{
+    GeoFenceController* const controller = geoFenceController();
+    missionController()->setHomePosition(TestFixtures::Coord::zurich());
+
+    addPolygon(controller)->setBreachActions({FENCE_ACTION_RTL, FENCE_ACTION_LAND});
+    addPolygon(controller);
+    QGCFenceCircle* const homeCircle = addCircle(controller);
+    homeCircle->setHomeCentered(true);
+    homeCircle->setBreachActions({FENCE_ACTION_HOLD});
+    addCircle(controller);
+
+    QJsonObject json;
+    controller->save(json);
+
+    // Fences with actions use a newer version so older QGC rejects them; the others stay readable
+    const QJsonArray jsonPolygons = json[QStringLiteral("polygons")].toArray();
+    QCOMPARE(jsonPolygons.count(), 2);
+    QCOMPARE(jsonPolygons[0].toObject()[JsonParsing::jsonVersionKey].toInt(), 2);
+    QCOMPARE(jsonPolygons[0].toObject()[QStringLiteral("breachActions")].toArray(), QJsonArray({5, 6}));
+    QCOMPARE(jsonPolygons[1].toObject()[JsonParsing::jsonVersionKey].toInt(), 1);
+    QVERIFY(!jsonPolygons[1].toObject().contains(QStringLiteral("breachActions")));
+    const QJsonArray jsonCircles = json[QStringLiteral("circles")].toArray();
+    QCOMPARE(jsonCircles.count(), 2);
+    QCOMPARE(jsonCircles[0].toObject()[JsonParsing::jsonVersionKey].toInt(), 3);
+    QCOMPARE(jsonCircles[1].toObject()[JsonParsing::jsonVersionKey].toInt(), 1);
+
+    QString errorString;
+    QVERIFY2(controller->load(json, errorString), qPrintable(errorString));
+    QCOMPARE(controller->polygons()->count(), 2);
+    QCOMPARE(controller->polygons()->value<QGCFencePolygon*>(0)->breachActions(),
+             QList<int>({FENCE_ACTION_RTL, FENCE_ACTION_LAND}));
+    QVERIFY(controller->polygons()->value<QGCFencePolygon*>(1)->breachActions().isEmpty());
+    QCOMPARE(controller->circles()->count(), 2);
+    QVERIFY(controller->circles()->value<QGCFenceCircle*>(0)->homeCentered());
+    QCOMPARE(controller->circles()->value<QGCFenceCircle*>(0)->breachActions(), QList<int>({FENCE_ACTION_HOLD}));
+    QVERIFY(controller->circles()->value<QGCFenceCircle*>(1)->breachActions().isEmpty());
+    QVERIFY(controller->hasBreachActions());
+    QVERIFY(!controller->dirty());
+}
+
+void GeoFenceControllerTest::_testFenceJsonVersionMatchesBreachActions_data()
+{
+    QTest::addColumn<bool>("circle");
+    QTest::addColumn<int>("version");
+    QTest::addColumn<bool>("homeCentered");
+    QTest::addColumn<QJsonValue>("actions");
+    QTest::addColumn<bool>("loads");
+
+    const QJsonValue none;  // key absent
+    const QJsonValue rtlLand(QJsonArray({5, 6}));
+
+    QTest::newRow("polygon v1") << false << 1 << false << none << true;
+    QTest::newRow("polygon v2 actions") << false << 2 << false << rtlLand << true;
+    QTest::newRow("polygon v1 actions") << false << 1 << false << rtlLand << false;
+    QTest::newRow("polygon v2 no actions") << false << 2 << false << none << false;
+    QTest::newRow("circle v3 actions") << true << 3 << false << rtlLand << true;
+    QTest::newRow("circle v3 home actions") << true << 3 << true << rtlLand << true;
+    QTest::newRow("circle v2 home actions") << true << 2 << true << rtlLand << false;
+    QTest::newRow("circle v1 actions") << true << 1 << false << rtlLand << false;
+    QTest::newRow("circle v3 no actions") << true << 3 << false << none << false;
+    QTest::newRow("empty list") << false << 2 << false << QJsonValue(QJsonArray()) << false;
+    QTest::newRow("default in list") << false << 2 << false << QJsonValue(QJsonArray({5, 0})) << false;
+    QTest::newRow("four actions") << false << 2 << false << QJsonValue(QJsonArray({2, 5, 6, 7})) << false;
+    QTest::newRow("unknown action") << false << 2 << false << QJsonValue(QJsonArray({99})) << false;
+    QTest::newRow("huge action") << false << 2 << false << QJsonValue(QJsonArray({1e20})) << false;
+    QTest::newRow("fractional action") << false << 2 << false << QJsonValue(QJsonArray({5.5})) << false;
+    QTest::newRow("not a list") << false << 2 << false << QJsonValue(5) << false;
+}
+
+void GeoFenceControllerTest::_testFenceJsonVersionMatchesBreachActions()
+{
+    QFETCH(bool, circle);
+    QFETCH(int, version);
+    QFETCH(bool, homeCentered);
+    QFETCH(QJsonValue, actions);
+    QFETCH(bool, loads);
+
+    QJsonObject json;
+    if (circle) {
+        QGCFenceCircle(home2D(), 100.0, true /* inclusion */).saveToJson(json);
+    } else {
+        QGCFencePolygon polygon(true /* inclusion */);
+        polygon.appendVertex(home2D());
+        polygon.appendVertex(home2D().atDistanceAndAzimuth(100, 0));
+        polygon.appendVertex(home2D().atDistanceAndAzimuth(100, 90));
+        polygon.saveToJson(json);
+    }
+    json[JsonParsing::jsonVersionKey] = version;
+    if (homeCentered) {
+        json[QStringLiteral("homeCentered")] = true;
+    }
+    if (!actions.isUndefined() && !actions.isNull()) {
+        json[QStringLiteral("breachActions")] = actions;
+    }
+
+    QString errorString;
+    bool loaded = false;
+    QList<int> loadedActions;
+    if (circle) {
+        QGCFenceCircle fence;
+        fence.setBreachActions({FENCE_ACTION_REPORT});
+        loaded = fence.loadFromJson(json, errorString);
+        loadedActions = fence.breachActions();
+    } else {
+        QGCFencePolygon fence(true /* inclusion */);
+        fence.setBreachActions({FENCE_ACTION_REPORT});
+        loaded = fence.loadFromJson(json, true /* required */, errorString);
+        loadedActions = fence.breachActions();
+    }
+    QCOMPARE(loaded, loads);
+    if (loads) {
+        // Loading also clears actions the fence had before
+        QCOMPARE(loadedActions.isEmpty(), actions.isNull() || actions.isUndefined());
     } else {
         QVERIFY(!errorString.isEmpty());
     }

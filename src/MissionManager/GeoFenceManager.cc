@@ -2,6 +2,7 @@
 #include "Vehicle.h"
 #include "QmlObjectListModel.h"
 #include "QGCLoggingCategory.h"
+#include "QGCFenceBreachActions.h"
 
 QGC_LOGGING_CATEGORY(GeoFenceManagerLog, "PlanManager.GeoFenceManager")
 
@@ -18,6 +19,24 @@ GeoFenceManager::GeoFenceManager(Vehicle* vehicle)
 GeoFenceManager::~GeoFenceManager()
 {
 
+}
+
+void GeoFenceManager::_appendBreachActionItem(const QList<int>& breachActions, QList<MissionItem*>& fenceItems)
+{
+    if (breachActions.isEmpty()) {
+        return;
+    }
+
+    // Applies to the polygon or circle sent next
+    MissionItem* item = new MissionItem(0, MAV_CMD_NAV_SET_FENCE_ACTION, MAV_FRAME_GLOBAL,
+                                        QGCFenceBreachActions::param(breachActions, 0),
+                                        QGCFenceBreachActions::param(breachActions, 1),
+                                        QGCFenceBreachActions::param(breachActions, 2),
+                                        0, 0, 0, 0,     // param 4-7 unused
+                                        false,          // autocontinue
+                                        false,          // isCurrentItem
+                                        this);          // parent
+    fenceItems.append(item);
 }
 
 void GeoFenceManager::sendToVehicle(const QGeoCoordinate&   breachReturn,
@@ -40,6 +59,7 @@ void GeoFenceManager::sendToVehicle(const QGeoCoordinate&   breachReturn,
     for (int i=0; i<_sendPolygons.count(); i++) {
         const QGCFencePolygon& polygon = _sendPolygons[i];
 
+        _appendBreachActionItem(polygon.breachActions(), fenceItems);
         for (int j=0; j<polygon.count(); j++) {
             const QGeoCoordinate& vertex = polygon.path()[j].value<QGeoCoordinate>();
 
@@ -71,6 +91,7 @@ void GeoFenceManager::sendToVehicle(const QGeoCoordinate&   breachReturn,
             longitude = 0;
         }
 
+        _appendBreachActionItem(circle.breachActions(), fenceItems);
         MissionItem* item = new MissionItem(0, command, MAV_FRAME_GLOBAL,
                                             circle.radius()->rawValue().toDouble(),  // param 1 radius
                                             0, 0, 0,                                 // param 2-4 unused
@@ -132,9 +153,13 @@ void GeoFenceManager::_planManagerLoadComplete(bool removeAllRequested)
     MAV_CMD expectedCommand = (MAV_CMD)0;
     int expectedVertexCount = 0;
     QGCFencePolygon nextPolygon(true /* inclusion */);
+    // Actions of a MAV_CMD_NAV_SET_FENCE_ACTION item, waiting for the polygon or circle after it
+    QList<int> pendingBreachActions;
+    bool breachActionsPending = false;
     const QList<MissionItem*>& fenceItems = missionItems();
 
-    for (int i=0; i<fenceItems.count(); i++) {
+    int i = 0;
+    for (; i<fenceItems.count(); i++) {
         MissionItem* item = fenceItems[i];
 
         MAV_CMD command = item->command();
@@ -144,6 +169,9 @@ void GeoFenceManager::_planManagerLoadComplete(bool removeAllRequested)
                 // Starting a new polygon
                 expectedVertexCount = item->param1();
                 expectedCommand = command;
+                nextPolygon.setBreachActions(pendingBreachActions);
+                pendingBreachActions.clear();
+                breachActionsPending = false;
             } else if (expectedVertexCount != item->param1()){
                 // In the middle of a polygon, but count suddenly changed
                 emit error(BadPolygonItemFormat, tr("GeoFence load: Vertex count change mid-polygon - actual:expected") + QString(" %1:%2").arg(item->param1()).arg(expectedVertexCount));
@@ -170,13 +198,39 @@ void GeoFenceManager::_planManagerLoadComplete(bool removeAllRequested)
             QGCFenceCircle circle(QGeoCoordinate(item->param5(), item->param6()), item->param1(),
                                   command != MAV_CMD_NAV_FENCE_CIRCLE_EXCLUSION /* inclusion */);
             circle.setHomeCentered(command == MAV_CMD_NAV_FENCE_HOME_CIRCLE_INCLUSION);
+            circle.setBreachActions(pendingBreachActions);
+            pendingBreachActions.clear();
+            breachActionsPending = false;
             _circles.append(circle);
+        } else if (command == MAV_CMD_NAV_SET_FENCE_ACTION) {
+            if (nextPolygon.count() != 0) {
+                emit error(IncompletePolygonLoad, tr("GeoFence load: Incomplete polygon loaded"));
+                loadFailed = true;
+                break;
+            }
+            if (breachActionsPending) {
+                emit error(BadBreachActionItem, tr("GeoFence load: Breach action not followed by a polygon or circle"));
+                loadFailed = true;
+                break;
+            }
+            pendingBreachActions = QGCFenceBreachActions::fromParams(item->param1(), item->param2(), item->param3());
+            breachActionsPending = true;
         } else if (command == MAV_CMD_NAV_FENCE_RETURN_POINT) {
+            if (breachActionsPending) {
+                emit error(BadBreachActionItem, tr("GeoFence load: Breach action not followed by a polygon or circle"));
+                loadFailed = true;
+                break;
+            }
             _breachReturnPoint = QGeoCoordinate(item->param5(), item->param6(), item->param7());
         } else {
             emit error(UnsupportedCommand, tr("GeoFence load: Unsupported command %1").arg(item->command()));
             break;
         }
+    }
+
+    if (i == fenceItems.count() && breachActionsPending) {
+        emit error(BadBreachActionItem, tr("GeoFence load: Breach action not followed by a polygon or circle"));
+        loadFailed = true;
     }
 
     if (loadFailed) {

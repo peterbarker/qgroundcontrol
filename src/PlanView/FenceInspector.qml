@@ -19,6 +19,10 @@ Item {
     readonly property var   _fence:     page.selectedObject
     readonly property var   _controller: page.controller
     readonly property bool  _homeCentered: _kind === "circle" && _fence !== null && _fence.homeCentered === true
+    readonly property bool  _isArea:       (_kind === "polygon" || _kind === "circle") && _fence !== null
+    // Also shown on unsupported firmware for a fence that has actions, so they can be cleared
+    readonly property bool  _showBreachActions: _isArea &&
+                                                (_controller.breachActionsSupported || _fence.breachActions.length > 0)
 
     QGCPalette { id: qgcPal }
 
@@ -118,6 +122,14 @@ Item {
                         }
                         return qsTr("Drag the center on the map to move the fence.")
                     }
+                }
+
+                FenceBreachActionEditor {
+                    Layout.fillWidth:   true
+                    namePrefix:         "planPanel_fenceBreachAction"
+                    fence:              root._isArea ? root._fence : null
+                    controller:         root._controller
+                    visible:            root._showBreachActions
                 }
 
                 Loader {

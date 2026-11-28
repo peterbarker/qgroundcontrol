@@ -21,6 +21,8 @@ Rectangle {
     readonly property real  _radius:            ScreenTools.defaultFontPixelWidth / 2
     // Also shown when unsupported but a loaded plan has home circles, so they can be turned off
     readonly property bool  _showHomeColumn:    myGeoFenceController.homeCircleSupported || myGeoFenceController.hasHomeCircle
+    // Also shown when unsupported but a loaded plan has breach actions, so they can be cleared
+    readonly property bool  _showBreachActions: myGeoFenceController.breachActionsSupported || myGeoFenceController.hasBreachActions
 
     QGCLabel {
         id:                 geoFenceLabel
@@ -208,6 +210,14 @@ Rectangle {
                     }
                 } // GridLayout
 
+                BreachActionList {
+                    anchors.left:   parent.left
+                    anchors.right:  parent.right
+                    fences:         myGeoFenceController.polygons
+                    fenceName:      qsTr("Polygon %1")
+                    visible:        _showBreachActions && polygonSection.checked && myGeoFenceController.polygons.count > 0
+                }
+
                 SectionHeader {
                     id:             circleSection
                     anchors.left:   parent.left
@@ -321,6 +331,14 @@ Rectangle {
                     }
                 } // GridLayout
 
+                BreachActionList {
+                    anchors.left:   parent.left
+                    anchors.right:  parent.right
+                    fences:         myGeoFenceController.circles
+                    fenceName:      qsTr("Circle %1")
+                    visible:        _showBreachActions && circleSection.checked && myGeoFenceController.circles.count > 0
+                }
+
                 SectionHeader {
                     id:             breachReturnSection
                     anchors.left:   parent.left
@@ -361,6 +379,71 @@ Rectangle {
                     }
                 }
 
+            }
+        }
+    }
+
+    // Breach actions of the fences in the grid above, in the same order. A list rather than a grid
+    // column: the panel is at most 30 characters wide and the grids already fill it.
+    component BreachActionList: ColumnLayout {
+        id: breachActionList
+
+        required property var       fences
+        required property string    fenceName
+
+        spacing: _margin
+
+        QGCLabel {
+            text: qsTr("Breach actions")
+        }
+
+        Repeater {
+            model: breachActionList.fences
+
+            RowLayout {
+                id: breachActionRow
+
+                required property var   object
+                required property int   index
+
+                Layout.fillWidth:   true
+                spacing:            ScreenTools.defaultFontPixelWidth
+
+                QGCLabel {
+                    Layout.fillWidth:   true
+                    wrapMode:           Text.WordWrap
+                    text:               qsTr("%1: %2").arg(breachActionList.fenceName.arg(breachActionRow.index + 1))
+                                            .arg(myGeoFenceController.breachActionsDescription(breachActionRow.object.breachActions))
+                }
+
+                QGCButton {
+                    text:       qsTr("Set")
+                    onClicked:  breachActionDialogFactory.open({ fence: breachActionRow.object })
+                }
+            }
+        }
+    }
+
+    QGCPopupDialogFactory {
+        id: breachActionDialogFactory
+
+        dialogComponent: breachActionDialog
+    }
+
+    Component {
+        id: breachActionDialog
+
+        QGCPopupDialog {
+            id:         breachActionPopup
+            title:      qsTr("Breach Action")
+            buttons:    Dialog.Close
+
+            property var fence
+
+            FenceBreachActionEditor {
+                width:      ScreenTools.defaultFontPixelWidth * 40
+                fence:      breachActionPopup.fence
+                controller: myGeoFenceController
             }
         }
     }

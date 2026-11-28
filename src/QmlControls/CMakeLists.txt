@@ -30,6 +30,8 @@ target_sources(
         ObjectListModelBase.h
         ParameterEditorController.cc
         ParameterEditorController.h
+        QGCFenceBreachActions.cc
+        QGCFenceBreachActions.h
         QGCFenceCircle.cc
         QGCFenceCircle.h
         QGCFencePolygon.cc

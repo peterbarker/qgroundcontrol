@@ -55,6 +55,7 @@ public:
     bool sendHomePositionToVehicle() const override { return true; }
 
     bool supportsFenceHomeCircle(const Vehicle* vehicle) const override;
+    QList<int> supportedFenceBreachActions(const Vehicle* vehicle) const override;
     QString missionCommandOverrides(QGCMAVLink::VehicleClass_t vehicleClass) const override;
     QString _internalParameterMetaDataFile(const Vehicle* vehicle) const override;
     MAV_AUTOPILOT _autopilotType() const override { return MAV_AUTOPILOT_ARDUPILOTMEGA; }
@@ -86,6 +87,9 @@ protected:
     virtual ~APMFirmwarePlugin();
 
     void setSupportedModes(QList<APMCustomMode> supportedModes) { _supportedModes = supportedModes; }
+
+    /// FENCE_ACTION values this vehicle type accepts in MAV_CMD_NAV_SET_FENCE_ACTION fence items
+    virtual QList<int> _fenceBreachActions() const { return {}; }
 
     bool _coaxialMotors = false;
 

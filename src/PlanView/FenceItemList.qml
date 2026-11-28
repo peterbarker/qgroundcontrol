@@ -43,8 +43,9 @@ QGCListView {
         }
 
         QGCLabel {
-            Layout.fillWidth:   true
-            elide:              Text.ElideRight
+            Layout.fillWidth:       true
+            Layout.minimumWidth:    implicitWidth
+            elide:                  Text.ElideRight
             text: {
                 switch (row.modelData.kind) {
                 case "polygon":
@@ -57,9 +58,12 @@ QGCListView {
         }
 
         QGCLabel {
-            objectName:         "planPanel_fenceRowMeta"
-            color:              qgcPal.textSecondary
-            font.pointSize:     ScreenTools.smallFontPointSize
+            objectName:             "planPanel_fenceRowMeta"
+            Layout.fillWidth:       true
+            Layout.maximumWidth:    implicitWidth
+            elide:                  Text.ElideRight
+            color:                  qgcPal.textSecondary
+            font.pointSize:         ScreenTools.smallFontPointSize
             text: {
                 if (row.modelData.kind === "breach") {
                     return root.page.controller.breachReturnPoint.isValid ? qsTr("Set") : qsTr("Not set")
@@ -68,11 +72,15 @@ QGCListView {
                     return ""
                 }
                 const inclusion = row.fence.inclusion ? qsTr("Include") : qsTr("Exclude")
+                let meta = inclusion
                 if (row.modelData.kind === "circle") {
                     const kind = row.fence.homeCentered ? qsTr("Home") : inclusion
-                    return qsTr("%1 %2, %3").arg(row.fence.radius.valueString).arg(row.fence.radius.units).arg(kind)
+                    meta = qsTr("%1 %2, %3").arg(row.fence.radius.valueString).arg(row.fence.radius.units).arg(kind)
                 }
-                return inclusion
+                if (row.fence.breachActions.length > 0) {
+                    meta = qsTr("%1, %2").arg(meta).arg(root.page.controller.breachActionsDescription(row.fence.breachActions))
+                }
+                return meta
             }
         }
     }

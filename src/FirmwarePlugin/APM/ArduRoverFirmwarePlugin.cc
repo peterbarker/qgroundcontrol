@@ -115,3 +115,9 @@ uint32_t ArduRoverFirmwarePlugin::_convertToCustomFlightModeEnum(uint32_t val) c
         return UINT32_MAX;
     }
 }
+
+QList<int> ArduRoverFirmwarePlugin::_fenceBreachActions() const
+{
+    return {FENCE_ACTION_REPORT, FENCE_ACTION_HOLD, FENCE_ACTION_SMART_RTL, FENCE_ACTION_RTL,
+            FENCE_ACTION_TERMINATE};
+}
